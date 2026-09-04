@@ -1,12 +1,19 @@
 import HeroSection from "../../components/home/HeroSection";
-import type { Opinion, Theme } from "../../types";
+import type { Opinion } from "../../types";
 import BreadcrumbView from "../common/BreadcrumbView";
 import FeaturedQuestionsSection from "../home/FeaturedQuestionsSection";
 import OpinionsSection from "../home/OpinionsSection";
 import QuestionsTable from "../home/QuestionsTable";
 
 export interface TopPageTemplateProps {
-  themes?: Theme[];
+  themes?: {
+    _id?: string;
+    id?: string;
+    title: string;
+    description?: string;
+    slug?: string;
+  }[];
+
   latestQuestions?: {
     _id: string;
     questionText: string;
@@ -19,6 +26,7 @@ export interface TopPageTemplateProps {
     uniqueParticipantCount?: number;
     createdAt?: string;
   }[];
+
   latestOpinions?: Opinion[];
 }
 
