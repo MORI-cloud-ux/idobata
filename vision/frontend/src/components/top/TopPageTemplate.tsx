@@ -1,11 +1,12 @@
 import HeroSection from "../../components/home/HeroSection";
-import type { Opinion } from "../../types";
+import type { Opinion, Theme } from "../../types";
 import BreadcrumbView from "../common/BreadcrumbView";
 import FeaturedQuestionsSection from "../home/FeaturedQuestionsSection";
 import OpinionsSection from "../home/OpinionsSection";
 import QuestionsTable from "../home/QuestionsTable";
 
 export interface TopPageTemplateProps {
+  themes?: Theme[];
   latestQuestions?: {
     _id: string;
     questionText: string;
@@ -22,17 +23,19 @@ export interface TopPageTemplateProps {
 }
 
 const TopPageTemplate = ({
+  themes = [],
   latestQuestions = [],
   latestOpinions = [],
 }: TopPageTemplateProps) => {
   const maxFeaturedQuestions = 70;
+
   const featuredQuestions = latestQuestions
     .map((q) => ({
       id: q._id,
       title: q.questionText,
       description: q.tagLine || `${q.questionText.substring(0, 100)}...`,
       participantCount: q.uniqueParticipantCount || 0,
-      commentCount: q.issueCount || 0 + (q.solutionCount || 0),
+      commentCount: (q.issueCount || 0) + (q.solutionCount || 0),
       likeCount: q.likeCount || 0,
       themeId: q.themeId,
       tags: q.tags || [],
@@ -54,7 +57,7 @@ const TopPageTemplate = ({
         <BreadcrumbView items={[]} />
       </div>
 
-      <HeroSection latestQuestions={latestQuestions} />
+      <HeroSection themes={themes} />
 
       <OpinionsSection opinions={latestOpinions} />
 
@@ -72,7 +75,7 @@ const TopPageTemplate = ({
           tagLine: q.tagLine,
           description: q.tagLine || `${q.questionText.substring(0, 100)}...`,
           participantCount: q.uniqueParticipantCount || 0,
-          commentCount: q.issueCount || 0 + (q.solutionCount || 0),
+          commentCount: (q.issueCount || 0) + (q.solutionCount || 0),
         }))}
       />
     </div>
