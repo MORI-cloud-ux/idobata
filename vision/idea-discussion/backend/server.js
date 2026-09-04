@@ -11,6 +11,7 @@ import { callLLM } from "./services/llmService.js"; // Import LLM service
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 // --- Database Connection ---
 const mongoUri = process.env.MONGODB_URI;
 
@@ -30,6 +31,7 @@ try {
 // --- Express App Setup ---
 const app = express();
 const httpServer = createServer(app);
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.IDEA_CORS_ORIGIN
@@ -39,32 +41,28 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
-const PORT = process.env.PORT || 3000; // Use port from env or default to 3000
+
+const PORT = process.env.PORT || 3000;
 
 // --- Middleware ---
-// CORS: Allow requests from the frontend development server
 app.use(
   cors({
     origin: process.env.IDEA_CORS_ORIGIN
       ? process.env.IDEA_CORS_ORIGIN.split(",")
       : ["http://localhost:5173", "http://localhost:5175"],
-    // Add other origins (e.g., production frontend URL) if needed
   })
 );
 
-// JSON Parser: Parse incoming JSON requests
 app.use(express.json());
-
 app.use(express.urlencoded({ extended: true }));
 
 // --- API Routes ---
-// Health Check Endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date() });
 });
 
-import authRoutes from "./routes/authRoutes.js"; // 追加: 認証ルート
-import likeRoutes from "./routes/likeRoutes.js"; // Import like routes
+import authRoutes from "./routes/authRoutes.js";
+import likeRoutes from "./routes/likeRoutes.js";
 import questionEmbeddingRoutes from "./routes/questionEmbeddingRoutes.js";
 import siteConfigRoutes from "./routes/siteConfigRoutes.js";
 import themeChatRoutes from "./routes/themeChatRoutes.js";
@@ -74,15 +72,13 @@ import themeGenerateQuestionsRoutes from "./routes/themeGenerateQuestionsRoutes.
 import themeImportRoutes from "./routes/themeImportRoutes.js";
 import themePolicyRoutes from "./routes/themePolicyRoutes.js";
 import themeProblemRoutes from "./routes/themeProblemRoutes.js";
-// Import theme-based routes
 import themeQuestionRoutes from "./routes/themeQuestionRoutes.js";
 import themeSolutionRoutes from "./routes/themeSolutionRoutes.js";
-import topPageRoutes from "./routes/topPageRoutes.js"; // Import top page routes
-import userRoutes from "./routes/userRoutes.js"; // Import user routes
+import topPageRoutes from "./routes/topPageRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 
 // Theme management routes
 app.use("/api/themes", themeRoutes);
-
 app.use("/api/auth", authRoutes);
 
 app.use("/api/themes/:themeId/questions", themeQuestionRoutes);
@@ -100,34 +96,21 @@ app.use("/api/themes/:themeId", themeEmbeddingRoutes);
 app.use("/api/questions/:questionId", questionEmbeddingRoutes);
 
 app.use("/api/site-config", siteConfigRoutes);
-app.use("/api/top-page-data", topPageRoutes); // Add top page routes
+app.use("/api/top-page-data", topPageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/likes", likeRoutes);
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// --- Serve static files in production ---
-// This section will be useful when deploying to production
-// For development, we'll handle this with a fallback route
-if (process.env.NODE_ENV === "production") {
-  // Serve static files from the React app build directory
-  const frontendBuildPath = path.join(__dirname, "../frontend/dist");
-  app.use(express.static(frontendBuildPath));
-
-  // For any request that doesn't match an API route, serve the React app
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(frontendBuildPath, "index.html"));
-  });
-}
-
-// For development, add a fallback route to handle non-API requests
+// Fallback route for non-API requests
 app.use((req, res, next) => {
-  // If this is an API request, continue to the API routes
   if (req.path.startsWith("/api")) {
     return next();
   }
 
   const userIdProfileImageRegex = /^\/([0-9a-f-]+)\/profile-image$/;
   const match = req.path.match(userIdProfileImageRegex);
+
   if (match && req.method === "POST") {
     console.log(
       `Redirecting request from ${req.path} to /api/users${req.path}`
@@ -136,25 +119,20 @@ app.use((req, res, next) => {
     return next();
   }
 
-  // For all other routes in development, respond with a message
   res.status(200).send(`
 <html>
-    <head><title>Development Mode</title></head>
-    <body>
-        <h1>Backend Development Server</h1>
-        <p>This is the backend server running in development mode.</p>
-        <p>For client-side routing to work properly in development:</p>
-        <ul>
-            <li>Make sure your frontend Vite dev server is running (npm run dev in the frontend directory)</li>
-            <li>Access your app through the Vite dev server URL (typically http://localhost:5173)</li>
-            <li>The Vite dev server will proxy API requests to this backend server</li>
-        </ul>
-    </body>
+  <head>
+    <title>Idobata Backend</title>
+  </head>
+  <body>
+    <h1>Idobata Backend Server</h1>
+    <p>The backend server is running.</p>
+  </body>
 </html>
 `);
 });
 
-// --- Error Handling Middleware (Example - Add more specific handlers later) ---
+// --- Error Handling Middleware ---
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send("Something broke!");
