@@ -1,0 +1,26 @@
+FROM node:20-alpine AS backend-builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY ./vision/idea-discussion/backend/package.json ./vision/idea-discussion/backend/
+
+RUN npm install --workspace=idobata-idea-discussion-backend
+
+WORKDIR /app/vision/idea-discussion/backend
+COPY ./vision/idea-discussion/backend ./
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --from=backend-builder /app/node_modules ./node_modules
+COPY --from=backend-builder /app/vision/idea-discussion/backend ./vision/idea-discussion/backend
+
+ENV NODE_ENV=production
+
+WORKDIR /app/vision/idea-discussion/backend
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
