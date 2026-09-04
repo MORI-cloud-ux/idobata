@@ -4,33 +4,49 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Select } from "../ui/select";
 
-interface HeroSectionProps {
-  latestQuestions?: {
-    _id: string;
-    questionText: string;
-    tagLine?: string;
-    themeId?: string;
-  }[];
+interface ThemeItem {
+  _id?: string;
+  id?: string;
+  title: string;
+  description?: string;
+  slug?: string;
 }
 
-const HeroSection = ({ latestQuestions = [] }: HeroSectionProps) => {
-  const [selectedQuestion, setSelectedQuestion] = useState("");
+interface HeroSectionProps {
+  themes?: ThemeItem[];
+}
+
+const HeroSection = ({ themes = [] }: HeroSectionProps) => {
+  const [selectedTheme, setSelectedTheme] = useState("");
   const navigate = useNavigate();
 
   const handleStartDialogue = () => {
-    if (selectedQuestion) {
-      const question = latestQuestions.find((q) => q._id === selectedQuestion);
-      if (question?.themeId) {
-        navigate(`/themes/${question.themeId}/questions/${selectedQuestion}`);
-      }
+    if (selectedTheme) {
+      navigate(`/themes/${selectedTheme}`);
     }
   };
 
-  // Format options for the select dropdown
-  const questionOptions = latestQuestions.map((q) => ({
-    value: q._id,
-    label: q.tagLine || `${q.questionText.substring(0, 50)}...`,
-  }));
+  const themeOptions = themes
+    .map((theme) => {
+      const themeId = theme._id || theme.id;
+
+      if (!themeId) {
+        return null;
+      }
+
+      return {
+        value: themeId,
+        label: theme.title,
+      };
+    })
+    .filter(
+      (
+        option
+      ): option is {
+        value: string;
+        label: string;
+      } => option !== null
+    );
 
   return (
     <div className="relative py-12 overflow-hidden rounded-b-3xl">
@@ -41,17 +57,14 @@ const HeroSection = ({ latestQuestions = [] }: HeroSectionProps) => {
 
       {/* Decorative circles */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Top right circle - slightly more than half visible */}
         <div className="absolute -top-[180px] -right-[180px] w-[450px] h-[450px]">
           <div className="w-full h-full rounded-full border-[100px] border-white/60" />
         </div>
 
-        {/* Bottom left circle - slightly more than half visible */}
         <div className="absolute -bottom-[180px] -left-[180px] w-[450px] h-[450px]">
           <div className="w-full h-full rounded-full border-[100px] border-white/60" />
         </div>
 
-        {/* Arrow decorations - hidden on mobile */}
         <svg
           className="hidden md:block absolute bottom-8 right-1/4 w-20 h-8"
           viewBox="0 0 73 28"
@@ -100,29 +113,27 @@ const HeroSection = ({ latestQuestions = [] }: HeroSectionProps) => {
           <p className="text-md text-foreground font-bold mb-4 max-w-2xl mx-auto leading-relaxed">
             お題を選んで対話をはじめてください。
             <br />
-            対話内容は自動でレポートにまとめられ、政策立案に活かされます。
+            対話内容は自動でレポートにまとめられます。
           </p>
 
           <div className="flex flex-col items-center gap-4">
-            {/* Question Dropdown */}
             <div className="w-full max-w-md">
               <Select
-                value={selectedQuestion}
-                onChange={(e) => setSelectedQuestion(e.target.value)}
+                value={selectedTheme}
+                onChange={(e) => setSelectedTheme(e.target.value)}
                 options={[
                   { value: "", label: "お題を選んでください" },
-                  ...questionOptions,
+                  ...themeOptions,
                 ]}
                 size="lg"
                 className="bg-white border-blue-400 border-2 text-gray-700"
               />
             </div>
 
-            {/* Start Dialogue Button */}
             <Button
               onClick={handleStartDialogue}
               size="lg"
-              disabled={!selectedQuestion}
+              disabled={!selectedTheme}
               className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-8 py-4 text-base font-medium rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               対話をはじめる
