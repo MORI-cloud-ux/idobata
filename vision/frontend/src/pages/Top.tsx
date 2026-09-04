@@ -6,11 +6,13 @@ import type { Opinion, Question, Theme } from "../types";
 
 const Top = () => {
   const { isMockMode } = useMock();
+
   const [topPageData, setTopPageData] = useState<{
     latestThemes: Theme[];
     latestQuestions: Question[];
     latestOpinions: Opinion[];
   } | null>(null);
+
   const [isLoading, setIsLoading] = useState(!isMockMode);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,9 +169,10 @@ const Top = () => {
           discussions: mockDiscussionData,
           themes: mockThemeData,
           questions: mockQuestions,
-          latestOpinions: [], // Mock mode doesn't have opinions yet
+          latestOpinions: [],
         }
       : {
+          themes: topPageData?.latestThemes || [],
           latestQuestions: topPageData?.latestQuestions || [],
           latestOpinions: topPageData?.latestOpinions || [],
         };
