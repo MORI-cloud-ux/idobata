@@ -14,10 +14,11 @@ const ThemeDetail = () => {
   const { themeId } = useParams<{ themeId: string }>();
   const { isMockMode } = useMock();
   const { user } = useAuth();
+
   const floatingChatRef = useRef<FloatingChatRef>(null);
-  const [chatManager, setChatManager] = useState<ThemeDetailChatManager | null>(
-    null
-  );
+
+  const [chatManager, setChatManager] =
+    useState<ThemeDetailChatManager | null>(null);
 
   const {
     themeDetail: apiThemeDetail,
@@ -53,7 +54,8 @@ const ThemeDetail = () => {
     },
     {
       id: 2,
-      question: "新卒一括採用に代わる、若者の能力を活かせる採用の仕組みとは？",
+      question:
+        "新卒一括採用に代わる、若者の能力を活かせる採用の仕組みとは？",
       tagLine: "能力重視の採用へ",
       tags: ["採用", "新卒", "能力"],
       voteCount: 38,
@@ -76,21 +78,45 @@ const ThemeDetail = () => {
       id: 1,
       text: "新卒一括採用の仕組みが、若者のキャリア選択の幅を狭めている",
     },
-    { id: 2, text: "大学教育と実社会で求められるスキルにギャップがある" },
-    { id: 3, text: "若者の非正規雇用が増加し、将来設計が立てにくい" },
+    {
+      id: 2,
+      text: "大学教育と実社会で求められるスキルにギャップがある",
+    },
+    {
+      id: 3,
+      text: "若者の非正規雇用が増加し、将来設計が立てにくい",
+    },
     {
       id: 4,
       text: "キャリア教育が不十分で、自分に合った仕事を見つけられない若者が多い",
     },
-    { id: 5, text: "地方の若者は都市部に比べて就職機会が限られている" },
+    {
+      id: 5,
+      text: "地方の若者は都市部に比べて就職機会が限られている",
+    },
   ];
 
   const mockSolutions = [
-    { id: 1, text: "インターンシップ制度の拡充と単位認定の推進" },
-    { id: 2, text: "職業体験プログラムを中高生から段階的に導入する" },
-    { id: 3, text: "若者向けのキャリアカウンセリングサービスの無料提供" },
-    { id: 4, text: "リモートワークの推進による地方在住若者の就業機会拡大" },
-    { id: 5, text: "若者の起業支援と失敗しても再チャレンジできる制度の整備" },
+    {
+      id: 1,
+      text: "インターンシップ制度の拡充と単位認定の推進",
+    },
+    {
+      id: 2,
+      text: "職業体験プログラムを中高生から段階的に導入する",
+    },
+    {
+      id: 3,
+      text: "若者向けのキャリアカウンセリングサービスの無料提供",
+    },
+    {
+      id: 4,
+      text: "リモートワークの推進による地方在住若者の就業機会拡大",
+    },
+    {
+      id: 5,
+      text: "若者の起業支援と失敗しても再チャレンジできる制度の整備",
+    },
   ];
 
   useEffect(() => {
@@ -185,16 +211,16 @@ const ThemeDetail = () => {
               solutionCount: q.solutionCount ?? 0,
             })) ?? [],
           issues:
-  themeDetail?.issues?.map((issue) => ({
-    id: issue._id ?? "",
-    text: issue.content ?? "",
-  })) ?? [],
-
-solutions:
-  themeDetail?.solutions?.map((solution) => ({
-    id: solution._id ?? "",
-    text: solution.content ?? "",
-  })) ?? [],
+            themeDetail?.issues?.map((issue) => ({
+              id: issue._id ?? "",
+              text: issue.content ?? "",
+            })) ?? [],
+          solutions:
+            themeDetail?.solutions?.map((solution) => ({
+              id: solution._id ?? "",
+              text: solution.content ?? "",
+            })) ?? [],
+        };
 
     return (
       <>
