@@ -19,6 +19,7 @@ export class UserMessage implements Message {
   createdAt: Date;
   isStreaming?: boolean;
   id?: string;
+
   constructor(
     content: string,
     createdAt: Date = new Date(),
@@ -37,6 +38,7 @@ export class SystemMessage implements Message {
   createdAt: Date;
   isStreaming?: boolean;
   id?: string;
+
   constructor(
     content: string,
     createdAt: Date = new Date(),
@@ -55,6 +57,7 @@ export class SystemNotification implements Message {
   createdAt: Date;
   isStreaming?: boolean;
   id?: string;
+
   constructor(
     content: string,
     createdAt: Date = new Date(),
@@ -81,19 +84,27 @@ export interface PreviousExtractions {
 }
 
 // ドメインオブジェクトの型定義
+// 新仕様では content、旧仕様では statement を使用しているため
+// 移行期間中は両方を許容する
 export interface Problem {
   _id: string;
-  statement: string;
+  content?: string;
+  statement?: string;
   version?: number;
   sourceType?: string;
+  source?: string;
+  extractedFrom?: string;
   createdAt?: string;
 }
 
 export interface Solution {
   _id: string;
-  statement: string;
+  content?: string;
+  statement?: string;
   version?: number;
   sourceType?: string;
+  source?: string;
+  extractedFrom?: string;
   createdAt?: string;
 }
 
@@ -103,8 +114,8 @@ export interface Question {
   tagLine?: string;
   tags?: string[];
   createdAt?: string;
-  issueCount?: number; // 追加: 関連する課題の数
-  solutionCount?: number; // 追加: 関連する解決策の数
+  issueCount?: number;
+  solutionCount?: number;
   likeCount?: number;
   themeId?: string;
 }
@@ -166,9 +177,11 @@ export interface Opinion {
 
 export type MessageType = "user" | "system" | "system-message";
 
-// WebSocketから送信されるデータの型を拡張
+// WebSocketから送信される抽出データ
+// 新旧両形式を許容
 export interface ExtendedExtractionData {
   _id: string;
-  statement: string;
+  content?: string;
+  statement?: string;
   relevanceScore?: number;
 }
