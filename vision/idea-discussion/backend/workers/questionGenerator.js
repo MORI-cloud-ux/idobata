@@ -9,27 +9,28 @@ async function generateSharpQuestions(themeId) {
   );
 
   try {
-    // 1. Fetch all problems for this theme
-    // New schema uses "content".
-    // "statement" is also read for backward compatibility with older data.
+    // 現行スキーマは content。
+    // statement は旧データとの互換性のため残す。
     const problems = await Problem.find({ themeId })
       .select("content statement")
       .lean();
 
     if (!problems || problems.length === 0) {
       console.log(
-        `[QuestionGenerator] No problems found for theme ${themeId} to generate questions from.`
+        `[QuestionGenerator] No problems found for theme ${themeId}.`
       );
       return;
     }
 
     const problemStatements = problems
       .map((p) => p.content || p.statement || "")
-      .filter((text) => typeof text === "string" && text.trim().length > 0);
+      .filter(
+        (text) => typeof text === "string" && text.trim().length > 0
+      );
 
     if (problemStatements.length === 0) {
       console.log(
-        `[QuestionGenerator] Problems were found for theme ${themeId}, but no usable content was available.`
+        `[QuestionGenerator] Problems found, but no usable content for theme ${themeId}.`
       );
       return;
     }
@@ -38,70 +39,56 @@ async function generateSharpQuestions(themeId) {
       `[QuestionGenerator] Found ${problemStatements.length} usable problem statements for theme ${themeId}.`
     );
 
-    // 2. Prepare prompt for LLM
     const messages = [
       {
         role: "system",
-        content: `You are an AI assistant specialized in synthesizing problem statements into insightful "How Might We..." (HMW) questions based on Design Thinking principles.
+        content: `あなたは、市民から集められた課題を整理し、重要な論点となる問いを生成するAIです。
 
-Your goal is to generate concise, actionable, and thought-provoking questions that capture the essence of the underlying challenges presented in the input problem statements.
+入力された課題を整理・統合し、日本語で6つの重要論点を生成してください。
 
-Consolidate similar problems into broader HMW questions where appropriate.
+1〜3番目：
+現状と望ましい状態のギャップを明確にした問いにしてください。
+具体的な解決方法を問いの中に含めないでください。
 
-For question 1-3:
-- Describe both the current state ("現状はこう") and the desired state ("それをこうしたい").
-- Do NOT suggest or imply specific means, methods, or solutions.
-- Keep the problem space open for discussion.
+4〜6番目：
+「現状は○○だが、それが○○になるのは望ましいだろうか？」
+という形式を参考に、望ましい状態そのものについて議論できる問いにしてください。
 
-For question 4-6:
-- Use a format similar to:
-  「現状は○○だが、それが○○になるのは望ましいだろうか？」
-- Use these questions especially where consensus about the ideal state may be uncertain.
+一般の市民が理解できる平易な日本語を使用してください。
 
-Generate all questions in Japanese.
-Use language understandable to people who have completed compulsory education in Japan.
+必ず有効なJSONのみを返してください。
 
-Respond ONLY with a JSON object containing a single key: "questions".
+形式：
+{
+  "questions": [
+    {
+      "question": "重要論点となる問い",
+      "tagLine": "短い要約",
+      "tags": ["タグ1", "タグ2"]
+    }
+  ]
+}
 
-The value of "questions" must be an array of exactly 6 objects.
-
-Each object must contain:
-1. "question": Japanese question, approximately 50-100 characters.
-2. "tagLine": Short Japanese summary, approximately 20 characters.
-3. "tags": Array containing exactly 2 short Japanese category words.
-
-Return valid JSON only.`,
+questionsには6件を含めてください。`,
       },
       {
         role: "user",
         content: `以下は、このテーマについて参加者との対話から抽出された課題です。
 
-${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
+${problemStatements
+  .map((text, index) => `${index + 1}. ${text}`)
+  .join("\n")}
 
-これらの課題を統合・整理し、重要論点となる問いを6件生成してください。
-
-個別の発言を単純に言い換えるのではなく、複数の課題に共通する論点がある場合は統合してください。
-
-出力は必ず以下の形式のJSONだけにしてください。
-
-{
-  "questions": [
-    {
-      "question": "...",
-      "tagLine": "...",
-      "tags": ["...", "..."]
-    }
-  ]
-}`,
+これらを整理・統合して、重要論点を6件生成してください。
+必ずJSONのみで回答してください。`,
       },
     ];
 
-    // 3. Call LLM
-    console.log("[QuestionGenerator] Calling LLM to generate questions...");
+    console.log(
+      "[QuestionGenerator] Calling LLM to generate questions..."
+    );
 
-    // Use the default Flash model rather than the Pro model.
-    // This task does not require heavy reasoning and Flash is less likely
-    // to consume the output token budget with reasoning tokens.
+    // ProではなくFlashを使用
     const llmResponse = await callLLM(
       messages,
       true,
@@ -114,22 +101,19 @@ ${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
       llmResponse.questions.length === 0
     ) {
       console.error(
-        "[QuestionGenerator] Failed to get valid questions array from LLM response:",
+        "[QuestionGenerator] Invalid LLM response:",
         llmResponse
       );
       return;
     }
 
-    const generatedQuestionObjects = llmResponse.questions;
-
     console.log(
-      `[QuestionGenerator] LLM generated ${generatedQuestionObjects.length} question objects.`
+      `[QuestionGenerator] LLM generated ${llmResponse.questions.length} questions.`
     );
 
-    // 4. Save questions to DB
     let savedCount = 0;
 
-    for (const questionObj of generatedQuestionObjects) {
+    for (const questionObj of llmResponse.questions) {
       const questionText = questionObj.question;
       const tagLine = questionObj.tagLine || "";
       const tags = Array.isArray(questionObj.tags)
@@ -138,14 +122,14 @@ ${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
 
       if (!questionText || typeof questionText !== "string") {
         console.warn(
-          "[QuestionGenerator] Skipping invalid question object:",
+          "[QuestionGenerator] Skipping invalid question:",
           questionObj
         );
         continue;
       }
 
       try {
-        // New SharpQuestion schema uses "content"
+        // 現行SharpQuestionスキーマは content
         const result = await SharpQuestion.findOneAndUpdate(
           {
             content: questionText.trim(),
@@ -157,7 +141,6 @@ ${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
               tagLine,
               tags,
               themeId,
-              createdAt: new Date(),
             },
           },
           {
@@ -173,17 +156,18 @@ ${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
             `[QuestionGenerator] Saved question ID: ${result._id}`
           );
 
-          // Link problems/solutions to this generated question asynchronously
-          setTimeout(
-            () => linkQuestionToAllItems(result._id.toString()),
-            0
-          );
+          setTimeout(() => {
+            linkQuestionToAllItems(result._id.toString()).catch(
+              (error) => {
+                console.error(
+                  `[QuestionGenerator] Linking failed for ${result._id}:`,
+                  error
+                );
+              }
+            );
+          }, 0);
 
           savedCount++;
-        } else {
-          console.warn(
-            `[QuestionGenerator] Failed to save question: ${questionText}`
-          );
         }
       } catch (dbError) {
         console.error(
@@ -202,9 +186,6 @@ ${problemStatements.map((text, index) => `${index + 1}. ${text}`).join("\n")}
       error
     );
   }
-}
-
-export { generateSharpQuestions };
 }
 
 export { generateSharpQuestions };
