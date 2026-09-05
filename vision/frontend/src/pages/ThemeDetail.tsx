@@ -185,16 +185,16 @@ const ThemeDetail = () => {
               solutionCount: q.solutionCount ?? 0,
             })) ?? [],
           issues:
-            themeDetail?.issues?.map((issue) => ({
-              id: issue._id ?? "",
-              text: issue.statement ?? "",
-            })) ?? [],
-          solutions:
-            themeDetail?.solutions?.map((solution) => ({
-              id: solution._id ?? "",
-              text: solution.statement ?? "",
-            })) ?? [],
-        };
+  themeDetail?.issues?.map((issue) => ({
+    id: issue._id ?? "",
+    text: issue.content ?? "",
+  })) ?? [],
+
+solutions:
+  themeDetail?.solutions?.map((solution) => ({
+    id: solution._id ?? "",
+    text: solution.content ?? "",
+  })) ?? [],
 
     return (
       <>
