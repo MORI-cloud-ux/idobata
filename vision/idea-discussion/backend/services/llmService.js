@@ -32,7 +32,7 @@ async function callLLM(
   const options = {
     model: model,
     messages: messages,
-    max_tokens: 4096,
+    max_tokens: 2048,
   };
   if (jsonOutput) {
     options.response_format = { type: "json_object" };
