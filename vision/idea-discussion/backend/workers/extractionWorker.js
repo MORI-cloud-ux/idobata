@@ -211,29 +211,30 @@ async function saveAndLinkItem(
   themeId
 ) {
   let savedItem;
+
   if (itemData.type === "problem") {
     const newProblem = new Problem({
-      statement: itemData.statement,
-      sourceOriginId: sourceOriginId,
-      sourceType: sourceType,
-      sourceMetadata: sourceMetadata || {},
-      version: 1,
       themeId: themeId,
+      content: itemData.statement,
+      source: sourceType,
+      extractedFrom: sourceOriginId,
     });
+
     savedItem = await newProblem.save();
+
     console.log(
       `[ExtractionWorker] Added Problem: ${savedItem._id} from ${sourceType} ${sourceOriginId} for theme ${themeId}`
     );
   } else if (itemData.type === "solution") {
     const newSolution = new Solution({
-      statement: itemData.statement,
-      sourceOriginId: sourceOriginId,
-      sourceType: sourceType,
-      sourceMetadata: sourceMetadata || {},
-      version: 1,
       themeId: themeId,
+      content: itemData.statement,
+      source: sourceType,
+      extractedFrom: sourceOriginId,
     });
+
     savedItem = await newSolution.save();
+
     console.log(
       `[ExtractionWorker] Added Solution: ${savedItem._id} from ${sourceType} ${sourceOriginId} for theme ${themeId}`
     );
@@ -245,8 +246,10 @@ async function saveAndLinkItem(
       () => linkItemToQuestions(savedItem._id.toString(), itemData.type),
       0
     );
+
     return savedItem;
   }
+
   return null;
 }
 
