@@ -108,9 +108,13 @@ export interface Solution {
   createdAt?: string;
 }
 
+// 重要論点
+// 新仕様では content、旧仕様では questionText を使用しているため
+// 移行期間中は両方を許容する
 export interface Question {
   _id: string;
-  questionText: string;
+  content?: string;
+  questionText?: string;
   tagLine?: string;
   tags?: string[];
   createdAt?: string;
