@@ -48,6 +48,7 @@ export const getQuestionDetails = async (req, res) => {
     const relatedProblemsData = await Problem.find({
       _id: { $in: problemIds },
     }).lean();
+
     const relatedSolutionsData = await Solution.find({
       _id: { $in: solutionIds },
     }).lean();
@@ -56,8 +57,10 @@ export const getQuestionDetails = async (req, res) => {
     const relatedProblems = relatedProblemsData
       .map((problem) => {
         const link = problemLinks.find(
-          (link) => link.linkedItemId.toString() === problem._id.toString()
+          (link) =>
+            link.linkedItemId.toString() === problem._id.toString()
         );
+
         return {
           ...problem,
           relevanceScore: link?.relevanceScore || 0,
@@ -68,8 +71,10 @@ export const getQuestionDetails = async (req, res) => {
     const relatedSolutions = relatedSolutionsData
       .map((solution) => {
         const link = solutionLinks.find(
-          (link) => link.linkedItemId.toString() === solution._id.toString()
+          (link) =>
+            link.linkedItemId.toString() === solution._id.toString()
         );
+
         return {
           ...solution,
           relevanceScore: link?.relevanceScore || 0,
@@ -93,47 +98,43 @@ export const getQuestionDetails = async (req, res) => {
     const debateData = await getDebateAnalysis(questionId);
 
     // 対話参加人数と対話数を計算
-    // 1. この質問に関連するProblemとSolutionのsourceOriginIdを取得
-    const allRelatedIds = [...problemIds, ...solutionIds];
-
-    // 2. これらのIDに関連するChatThreadを取得（sourceTypeが'chat'のもの）
-    const relatedChatThreadIds = [];
-
-    // ProblemとSolutionからsourceOriginIdを取得
-    const relatedProblemsWithSource = await Problem.find({
-      _id: { $in: problemIds },
-      sourceType: "chat",
-    })
-      .select("sourceOriginId")
-      .lean();
-
-    const relatedSolutionsWithSource = await Solution.find({
-      _id: { $in: solutionIds },
-      sourceType: "chat",
-    })
-      .select("sourceOriginId")
-      .lean();
-
-    relatedChatThreadIds.push(
-      ...relatedProblemsWithSource.map((p) => p.sourceOriginId),
-      ...relatedSolutionsWithSource.map((s) => s.sourceOriginId)
-    );
-
-    // 3. 重複を除去
-    const uniqueChatThreadIds = [
-      ...new Set(relatedChatThreadIds.map((id) => id.toString())),
+    // 現行スキーマでは Problem / Solution の extractedFrom に
+    // 元となった ChatThread のIDが保存されている
+    const relatedChatThreadIds = [
+      ...relatedProblemsData
+        .map((problem) => problem.extractedFrom)
+        .filter(Boolean),
+      ...relatedSolutionsData
+        .map((solution) => solution.extractedFrom)
+        .filter(Boolean),
     ];
 
-    // 4. 対話参加人数（ユニークユーザー数）を計算
+    // ChatThread IDの重複を除去
+    const uniqueChatThreadIds = [
+      ...new Set(
+        relatedChatThreadIds.map((id) => id.toString())
+      ),
+    ];
+
+    // 対話参加人数 = 関連ChatThreadに含まれるユニークユーザー数
     const participantCount =
       uniqueChatThreadIds.length > 0
         ? await ChatThread.distinct("userId", {
             _id: { $in: uniqueChatThreadIds },
-          }).then((users) => users.length)
+          }).then(
+            (users) =>
+              users.filter(
+                (userId) =>
+                  userId !== null &&
+                  userId !== undefined &&
+                  userId !== ""
+              ).length
+          )
         : 0;
 
-    // 5. 対話数（オピニオンの数）= 関連するProblemとSolutionの総数
-    const dialogueCount = relatedProblems.length + relatedSolutions.length;
+    // 対話数 = この重要論点に関連付けられたProblem + Solutionの総数
+    const dialogueCount =
+      relatedProblems.length + relatedSolutions.length;
 
     res.status(200).json({
       question: {
@@ -144,12 +145,18 @@ export const getQuestionDetails = async (req, res) => {
       relatedSolutions,
       debateData,
       reportExample,
-      visualReport: visualReport ? visualReport.overallAnalysis : null,
+      visualReport: visualReport
+        ? visualReport.overallAnalysis
+        : null,
       participantCount,
       dialogueCount,
     });
   } catch (error) {
-    console.error(`Error fetching details for question ${questionId}:`, error);
+    console.error(
+      `Error fetching details for question ${questionId}:`,
+      error
+    );
+
     res.status(500).json({
       message: "Error fetching question details",
       error: error.message,
@@ -168,6 +175,7 @@ export const triggerPolicyGeneration = async (req, res) => {
   try {
     // Check if the question exists (optional but good practice)
     const question = await SharpQuestion.findById(questionId);
+
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
@@ -186,6 +194,7 @@ export const triggerPolicyGeneration = async (req, res) => {
     console.log(
       `[API Trigger] Policy generation triggered for questionId: ${questionId}`
     );
+
     res.status(202).json({
       message: `Policy draft generation started for question ${questionId}`,
     });
@@ -194,6 +203,7 @@ export const triggerPolicyGeneration = async (req, res) => {
       `Error triggering policy generation for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error triggering policy generation",
       error: error.message,
@@ -212,6 +222,7 @@ export const triggerDebateAnalysisGeneration = async (req, res) => {
   try {
     // Check if the question exists (optional but good practice)
     const question = await SharpQuestion.findById(questionId);
+
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
@@ -230,6 +241,7 @@ export const triggerDebateAnalysisGeneration = async (req, res) => {
     console.log(
       `[API Trigger] Debate analysis generation triggered for questionId: ${questionId}`
     );
+
     res.status(202).json({
       message: `Debate analysis generation started for question ${questionId}`,
     });
@@ -238,6 +250,7 @@ export const triggerDebateAnalysisGeneration = async (req, res) => {
       `Error triggering debate analysis generation for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error triggering debate analysis generation",
       error: error.message,
@@ -256,6 +269,7 @@ export const triggerDigestGeneration = async (req, res) => {
   try {
     // Check if the question exists (optional but good practice)
     const question = await SharpQuestion.findById(questionId);
+
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
@@ -274,6 +288,7 @@ export const triggerDigestGeneration = async (req, res) => {
     console.log(
       `[API Trigger] Digest generation triggered for questionId: ${questionId}`
     );
+
     res.status(202).json({
       message: `Digest draft generation started for question ${questionId}`,
     });
@@ -282,6 +297,7 @@ export const triggerDigestGeneration = async (req, res) => {
       `Error triggering digest generation for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error triggering digest generation",
       error: error.message,
@@ -300,6 +316,7 @@ export const triggerReportGeneration = async (req, res) => {
   try {
     // Check if the question exists (optional but good practice)
     const question = await SharpQuestion.findById(questionId);
+
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
@@ -318,6 +335,7 @@ export const triggerReportGeneration = async (req, res) => {
     console.log(
       `[API Trigger] Report generation triggered for questionId: ${questionId}`
     );
+
     res.status(202).json({
       message: `Report example generation started for question ${questionId}`,
     });
@@ -326,6 +344,7 @@ export const triggerReportGeneration = async (req, res) => {
       `Error triggering report generation for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error triggering report generation",
       error: error.message,
@@ -344,6 +363,7 @@ export const triggerVisualReportGeneration = async (req, res) => {
   try {
     // Check if the question exists
     const question = await SharpQuestion.findById(questionId);
+
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
@@ -362,6 +382,7 @@ export const triggerVisualReportGeneration = async (req, res) => {
     console.log(
       `[API Trigger] Visual report generation triggered for questionId: ${questionId}`
     );
+
     res.status(202).json({
       message: `Visual report generation started for question ${questionId}`,
     });
@@ -370,6 +391,7 @@ export const triggerVisualReportGeneration = async (req, res) => {
       `Error triggering visual report generation for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error triggering visual report generation",
       error: error.message,
@@ -389,7 +411,9 @@ export const getVisualReport = async (req, res) => {
     const visualReport = await getQuestionVisualReport(questionId);
 
     if (!visualReport) {
-      return res.status(404).json({ message: "Visual report not found" });
+      return res.status(404).json({
+        message: "Visual report not found",
+      });
     }
 
     res.status(200).json(visualReport);
@@ -398,6 +422,7 @@ export const getVisualReport = async (req, res) => {
       `Error getting visual report for question ${questionId}:`,
       error
     );
+
     res.status(500).json({
       message: "Error getting visual report",
       error: error.message,
@@ -417,9 +442,14 @@ export const getQuestionsByTheme = async (req, res) => {
     const questions = await SharpQuestion.find({ themeId }).sort({
       createdAt: -1,
     });
+
     res.status(200).json(questions);
   } catch (error) {
-    console.error(`Error fetching questions for theme ${themeId}:`, error);
+    console.error(
+      `Error fetching questions for theme ${themeId}:`,
+      error
+    );
+
     res.status(500).json({
       message: "Error fetching theme questions",
       error: error.message,
