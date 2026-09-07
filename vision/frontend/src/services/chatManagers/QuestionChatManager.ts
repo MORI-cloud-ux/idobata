@@ -163,10 +163,13 @@ export class QuestionChatManager {
       event
     );
     const { type, data } = event;
-    const notificationContent =
-      type === "problem"
-        ? `「${data.statement}」という課題が登録されました。`
-        : `「${data.statement}」という解決策が登録されました。`;
+    const extractionText =
+  　data.content ?? data.statement ?? "";
+
+const notificationContent =
+  type === "problem"
+    ? `「${extractionText}」という課題が登録されました。`
+    : `「${extractionText}」という解決策が登録されました。`;
 
     console.log(
       `[QuestionChatManager] Creating notification: ${notificationContent}`
