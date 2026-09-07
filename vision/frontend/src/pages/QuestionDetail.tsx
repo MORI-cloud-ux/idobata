@@ -23,43 +23,69 @@ const QuestionDetail = () => {
   const { themeId, qId } = useParams<{ themeId: string; qId: string }>();
   const { user } = useAuth();
   const chatRef = useRef<FloatingChatRef>(null);
+
   const [isOpinionsExpanded, setIsOpinionsExpanded] = useState(false);
-  const [chatManager, setChatManager] = useState<QuestionChatManager | null>(
-    null
-  );
+
+  const [chatManager, setChatManager] =
+    useState<QuestionChatManager | null>(null);
 
   const { questionDetail, isLoading, error } = useQuestionDetail(
     themeId || "",
     qId || ""
   );
+
   const [opinions, setOpinions] = useState<{
     issues: Array<{ id: string; text: string; relevance: number }>;
     solutions: Array<{ id: string; text: string; relevance: number }>;
-  }>({ issues: [], solutions: [] });
+  }>({
+    issues: [],
+    solutions: [],
+  });
+
   const { themeDetail: themeInfo } = useThemeDetail(themeId || "");
 
-  const isCommentDisabled = themeInfo?.theme?.disableNewComment === true;
+  const isCommentDisabled =
+    themeInfo?.theme?.disableNewComment === true;
 
-  // Chat manager effect - separate from page updates
+  // 現在仕様 content / 旧仕様 questionText の両方に対応
+  const resolvedQuestionText =
+    questionDetail?.question?.content ??
+    questionDetail?.question?.questionText ??
+    "";
+
+  // Chat manager effect
   useEffect(() => {
-    if (themeId && qId && user?.id && questionDetail?.question?.questionText) {
-      console.log("Creating new ChatManager");
-      const questionText = questionDetail?.question?.questionText || "";
+    if (
+      themeId &&
+      qId &&
+      user?.id &&
+      resolvedQuestionText
+    ) {
+      console.log("Creating new QuestionChatManager");
 
       const manager = new QuestionChatManager({
         themeId,
         questionId: qId,
-        questionText,
+        questionText: resolvedQuestionText,
         userId: user.id,
+
         onNewMessage: (message) => {
           let messageType: MessageType = "system";
+
           if (message.constructor.name === "UserMessage") {
             messageType = "user";
-          } else if (message.constructor.name === "SystemNotification") {
+          } else if (
+            message.constructor.name === "SystemNotification"
+          ) {
             messageType = "system-message";
           }
-          chatRef.current?.addMessage(message.content, messageType);
+
+          chatRef.current?.addMessage(
+            message.content,
+            messageType
+          );
         },
+
         onNewExtraction: () => {
           // Chat manager handles notifications only
           // Page updates are handled separately
@@ -69,44 +95,71 @@ const QuestionDetail = () => {
       setChatManager(manager);
 
       return () => {
-        console.log("Cleaning up ChatManager");
+        console.log("Cleaning up QuestionChatManager");
         manager.cleanup();
+        setChatManager(null);
       };
     }
-  }, [themeId, qId, questionDetail, user?.id]);
+  }, [
+    themeId,
+    qId,
+    user?.id,
+    resolvedQuestionText,
+  ]);
 
   // Separate effect for page updates via WebSocket
   useEffect(() => {
     if (!themeId) return;
 
-    console.log("Setting up WebSocket subscription for page updates");
+    console.log(
+      "Setting up WebSocket subscription for page updates"
+    );
 
-    // Subscribe to theme for real-time updates
     socketClient.subscribeToTheme(themeId);
 
-    // Handle new extractions for page updates
-    const handleNewExtraction = (extraction: NewExtractionEvent) => {
-      console.log("Page update - New extraction received:", extraction);
+    const handleNewExtraction = (
+      extraction: NewExtractionEvent
+    ) => {
+      console.log(
+        "Page update - New extraction received:",
+        extraction
+      );
+
       const { type, data } = extraction;
 
       if (type === "problem") {
         setOpinions((prev) => {
-          const exists = prev.issues.some((issue) => issue.id === data._id);
+          const exists = prev.issues.some(
+            (issue) => issue.id === data._id
+          );
+
           if (exists) {
-            console.log("Problem already exists, skipping:", data._id);
+            console.log(
+              "Problem already exists, skipping:",
+              data._id
+            );
             return prev;
           }
-          console.log("Adding new problem to page:", data._id);
+
+          console.log(
+            "Adding new problem to page:",
+            data._id
+          );
+
           return {
             ...prev,
             issues: [
               ...prev.issues,
               {
                 id: data._id,
-                text: data.statement,
+                text:
+                  data.content ??
+                  data.statement ??
+                  "",
                 relevance:
                   Math.round(
-                    (data as ExtendedExtractionData).relevanceScore * 100
+                    ((data as ExtendedExtractionData)
+                      .relevanceScore ?? 0) * 100
                   ) || 0,
               },
             ],
@@ -115,23 +168,37 @@ const QuestionDetail = () => {
       } else if (type === "solution") {
         setOpinions((prev) => {
           const exists = prev.solutions.some(
-            (solution) => solution.id === data._id
+            (solution) =>
+              solution.id === data._id
           );
+
           if (exists) {
-            console.log("Solution already exists, skipping:", data._id);
+            console.log(
+              "Solution already exists, skipping:",
+              data._id
+            );
             return prev;
           }
-          console.log("Adding new solution to page:", data._id);
+
+          console.log(
+            "Adding new solution to page:",
+            data._id
+          );
+
           return {
             ...prev,
             solutions: [
               ...prev.solutions,
               {
                 id: data._id,
-                text: data.statement,
+                text:
+                  data.content ??
+                  data.statement ??
+                  "",
                 relevance:
                   Math.round(
-                    (data as ExtendedExtractionData).relevanceScore * 100
+                    ((data as ExtendedExtractionData)
+                      .relevanceScore ?? 0) * 100
                   ) || 0,
               },
             ],
@@ -141,16 +208,21 @@ const QuestionDetail = () => {
     };
 
     const unsubscribeNewExtraction =
-      socketClient.onNewExtraction(handleNewExtraction);
+      socketClient.onNewExtraction(
+        handleNewExtraction
+      );
 
     return () => {
-      console.log("Cleaning up page WebSocket subscription");
+      console.log(
+        "Cleaning up page WebSocket subscription"
+      );
+
       unsubscribeNewExtraction();
       socketClient.unsubscribeFromTheme(themeId);
     };
   }, [themeId]);
 
-  // Separate useEffect for initializing opinions from questionDetail
+  // Initialize opinions from questionDetail
   useEffect(() => {
     if (
       questionDetail &&
@@ -159,26 +231,65 @@ const QuestionDetail = () => {
     ) {
       const initialOpinions = {
         issues:
-          questionDetail?.relatedProblems?.map((p) => ({
-            id: p._id,
-            text: p.statement,
-            relevance: Math.round(p.relevanceScore * 100) || 0,
-          })) ?? [],
+          questionDetail.relatedProblems?.map(
+            (p) => ({
+              id: p._id,
+              text:
+                p.content ??
+                p.statement ??
+                "",
+              relevance:
+                Math.round(
+                  (p.relevanceScore ?? 0) * 100
+                ) || 0,
+            })
+          ) ?? [],
+
         solutions:
-          questionDetail?.relatedSolutions?.map((s) => ({
-            id: s._id,
-            text: s.statement,
-            relevance: Math.round(s.relevanceScore * 100) || 0,
-          })) ?? [],
+          questionDetail.relatedSolutions?.map(
+            (s) => ({
+              id: s._id,
+              text:
+                s.content ??
+                s.statement ??
+                "",
+              relevance:
+                Math.round(
+                  (s.relevanceScore ?? 0) * 100
+                ) || 0,
+            })
+          ) ?? [],
       };
+
       setOpinions(initialOpinions);
     }
-  }, [questionDetail, opinions.issues.length, opinions.solutions.length]);
+  }, [
+    questionDetail,
+    opinions.issues.length,
+    opinions.solutions.length,
+  ]);
 
-  const handleSendMessage = (message: string) => {
-    if (chatManager) {
-      chatManager.addMessage(message, "user");
+  const handleSendMessage = async (
+    message: string
+  ) => {
+    console.log(
+      "QuestionDetail send:",
+      message,
+      "chatManager:",
+      !!chatManager
+    );
+
+    if (!chatManager) {
+      console.error(
+        "QuestionChatManager is not initialized"
+      );
+      return;
     }
+
+    await chatManager.addMessage(
+      message,
+      "user"
+    );
   };
 
   if (isLoading) {
@@ -203,21 +314,31 @@ const QuestionDetail = () => {
 
   if (questionDetail) {
     const questionData = {
-      id: questionDetail?.question?._id ?? "",
-      question: questionDetail?.question?.questionText ?? "",
-      tagLine: questionDetail?.question?.tagLine ?? "",
-      tags: questionDetail?.question?.tags ?? [],
-      voteCount: questionDetail?.question?.voteCount ?? 0,
+      id: questionDetail.question?._id ?? "",
+      question:
+        questionDetail.question?.content ??
+        questionDetail.question?.questionText ??
+        "",
+      tagLine:
+        questionDetail.question?.tagLine ?? "",
+      tags:
+        questionDetail.question?.tags ?? [],
+      voteCount:
+        questionDetail.question?.voteCount ?? 0,
     };
 
-    const questionTitle = questionData.tagLine || questionData.question || "";
+    const questionTitle =
+      questionData.tagLine ||
+      questionData.question ||
+      "";
 
     const themeData = {
       id: themeId || "",
-      title: questionTitle || themeInfo?.theme?.title || "テーマ",
+      title:
+        questionTitle ||
+        themeInfo?.theme?.title ||
+        "テーマ",
     };
-
-    // This is now handled by the separate useEffect above
 
     const breadcrumbItems = [
       {
@@ -230,19 +351,29 @@ const QuestionDetail = () => {
       <>
         <div className="xl:mr-[480px]">
           <div className="px-6">
-            <BreadcrumbView items={breadcrumbItems} />
-          </div>
-          <div className="px-6 py-8">
-            <ThemePromptSection
-              themeTitle={themeData.title}
-              themeDescription={questionData.question}
-              themeTags={questionData.tags}
-              participantCount={questionDetail?.participantCount || 0}
-              dialogueCount={questionDetail?.dialogueCount || 0}
+            <BreadcrumbView
+              items={breadcrumbItems}
             />
           </div>
 
-          {/* ほかの人の意見セクション */}
+          <div className="px-6 py-8">
+            <ThemePromptSection
+              themeTitle={themeData.title}
+              themeDescription={
+                questionData.question
+              }
+              themeTags={questionData.tags}
+              participantCount={
+                questionDetail.participantCount ||
+                0
+              }
+              dialogueCount={
+                questionDetail.dialogueCount ||
+                0
+              }
+            />
+          </div>
+
           <div className="mb-8 px-6">
             <div className="mb-6">
               <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 md:gap-0">
@@ -250,25 +381,36 @@ const QuestionDetail = () => {
                   <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
                     <Lightbulb className="w-8 h-8 text-orange-400 stroke-2" />
                   </div>
+
                   <h2 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-wide">
                     ほかの人の意見
                   </h2>
                 </div>
+
                 <div className="flex justify-end md:justify-start items-center gap-4 flex-wrap">
                   <div className="flex items-center justify-center gap-1 px-0 py-0">
                     <span className="text-xs text-red-500 font-normal leading-8 tracking-wide">
                       課題
                     </span>
+
                     <span className="text-xl font-bold text-gray-800 leading-8 tracking-wide">
-                      {opinions.issues.length}
+                      {
+                        opinions.issues
+                          .length
+                      }
                     </span>
                   </div>
+
                   <div className="flex items-center justify-center gap-1 px-0 py-0">
                     <span className="text-xs text-green-500 font-normal leading-8 tracking-wide">
                       対策
                     </span>
+
                     <span className="text-xl font-bold text-gray-800 leading-8 tracking-wide">
-                      {opinions.solutions.length}
+                      {
+                        opinions
+                          .solutions.length
+                      }
                     </span>
                   </div>
                 </div>
@@ -276,76 +418,143 @@ const QuestionDetail = () => {
             </div>
 
             {(() => {
-              // 課題と対策を統合して新しい順に並べる
               const allOpinions = [
-                ...opinions.issues.map((issue, index) => ({
-                  id: issue.id,
-                  text: issue.text,
-                  type: "課題" as const,
-                  relevance: issue.relevance,
-                  userName: `ユーザー${index + 1}`,
-                  userIconColor: ["red", "blue", "yellow", "green"][
-                    index % 4
-                  ] as "red" | "blue" | "yellow" | "green",
-                })),
-                ...opinions.solutions.map((solution, index) => ({
-                  id: solution.id,
-                  text: solution.text,
-                  type: "対策" as const,
-                  relevance: solution.relevance,
-                  userName: `ユーザー${index + opinions.issues.length + 1}`,
-                  userIconColor: ["red", "blue", "yellow", "green"][
-                    (index + opinions.issues.length) % 4
-                  ] as "red" | "blue" | "yellow" | "green",
-                })),
+                ...opinions.issues.map(
+                  (issue, index) => ({
+                    id: issue.id,
+                    text: issue.text,
+                    type: "課題" as const,
+                    relevance:
+                      issue.relevance,
+                    userName: `ユーザー${
+                      index + 1
+                    }`,
+                    userIconColor: [
+                      "red",
+                      "blue",
+                      "yellow",
+                      "green",
+                    ][
+                      index % 4
+                    ] as
+                      | "red"
+                      | "blue"
+                      | "yellow"
+                      | "green",
+                  })
+                ),
+
+                ...opinions.solutions.map(
+                  (
+                    solution,
+                    index
+                  ) => ({
+                    id: solution.id,
+                    text: solution.text,
+                    type: "対策" as const,
+                    relevance:
+                      solution.relevance,
+                    userName: `ユーザー${
+                      index +
+                      opinions.issues
+                        .length +
+                      1
+                    }`,
+                    userIconColor: [
+                      "red",
+                      "blue",
+                      "yellow",
+                      "green",
+                    ][
+                      (index +
+                        opinions.issues
+                          .length) %
+                        4
+                    ] as
+                      | "red"
+                      | "blue"
+                      | "yellow"
+                      | "green",
+                  })
+                ),
               ];
 
-              // 関連度の高い順にソートして表示数を決定
-              const displayedOpinions = allOpinions
-                .sort((a, b) => b.relevance - a.relevance)
-                .slice(0, isOpinionsExpanded ? allOpinions.length : 4);
+              const displayedOpinions =
+                allOpinions
+                  .sort(
+                    (a, b) =>
+                      b.relevance -
+                      a.relevance
+                  )
+                  .slice(
+                    0,
+                    isOpinionsExpanded
+                      ? allOpinions.length
+                      : 4
+                  );
 
               return (
                 <>
                   <div
-                    className={`bg-gray-100 rounded-xl p-3 relative ${isOpinionsExpanded ? "" : "max-h-[200px] overflow-hidden"}`}
+                    className={`bg-gray-100 rounded-xl p-3 relative ${
+                      isOpinionsExpanded
+                        ? ""
+                        : "max-h-[200px] overflow-hidden"
+                    }`}
                   >
                     <div className="flex flex-col md:flex-row md:flex-wrap gap-4 pt-3">
-                      {displayedOpinions.map((opinion) => (
-                        <OtherOpinionCard
-                          key={opinion.id}
-                          text={opinion.text}
-                          userName={opinion.userName}
-                          type={opinion.type}
-                          userIconColor={opinion.userIconColor}
-                        />
-                      ))}
+                      {displayedOpinions.map(
+                        (opinion) => (
+                          <OtherOpinionCard
+                            key={opinion.id}
+                            text={
+                              opinion.text
+                            }
+                            userName={
+                              opinion.userName
+                            }
+                            type={
+                              opinion.type
+                            }
+                            userIconColor={
+                              opinion.userIconColor
+                            }
+                          />
+                        )
+                      )}
                     </div>
 
-                    {/* グラデーションオーバーレイ - 展開時は非表示 */}
-                    {!isOpinionsExpanded && allOpinions.length > 4 && (
-                      <div className="absolute bottom-0 left-0 w-full h-[100px] bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
-                    )}
+                    {!isOpinionsExpanded &&
+                      allOpinions.length >
+                        4 && (
+                        <div className="absolute bottom-0 left-0 w-full h-[100px] bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
+                      )}
 
-                    {/* スクロールバー - 展開時は非表示 */}
-                    {!isOpinionsExpanded && allOpinions.length > 4 && (
-                      <div className="absolute top-1 right-0 w-2.5 h-[106px] bg-black/16 rounded-full" />
-                    )}
+                    {!isOpinionsExpanded &&
+                      allOpinions.length >
+                        4 && (
+                        <div className="absolute top-1 right-0 w-2.5 h-[106px] bg-black/16 rounded-full" />
+                      )}
                   </div>
 
-                  {/* 展開/折りたたみボタン - コンテナの外に配置 */}
-                  {allOpinions.length > 4 && (
+                  {allOpinions.length >
+                    4 && (
                     <div className="flex justify-center mt-4">
                       <button
                         type="button"
                         onClick={() =>
-                          setIsOpinionsExpanded(!isOpinionsExpanded)
+                          setIsOpinionsExpanded(
+                            !isOpinionsExpanded
+                          )
                         }
                         className="px-6 py-3 text-base font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200"
                       >
                         {isOpinionsExpanded
                           ? "折りたたむ"
-                          : `もっと見る (${allOpinions.length - 4}件)`}
+                          : `もっと見る (${
+                              allOpinions.length -
+                              4
+                            }件)`}
                       </button>
                     </div>
                   )}
@@ -354,46 +563,53 @@ const QuestionDetail = () => {
             })()}
           </div>
 
-          {/* 生成されたレポートセクション */}
           <div className="mb-8 px-6">
-            {/* ヘッダー */}
             <div className="mb-6">
               <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-0">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
                     <SquareChartGantt className="w-8 h-8 text-blue-400 stroke-2" />
                   </div>
+
                   <h2 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-wide">
                     生成されたレポート
                   </h2>
                 </div>
-                <DownloadButton>すべてダウンロード</DownloadButton>
+
+                <DownloadButton>
+                  すべてダウンロード
+                </DownloadButton>
               </div>
             </div>
 
-            {/* 論点まとめカード */}
             <ReportCard
               title="論点まとめ"
               downloadButtonText="PDFダウンロード"
-              isEmpty={!questionDetail?.debateData}
+              isEmpty={
+                !questionDetail.debateData
+              }
               emptyDescription="多くの対話が集まると、論点をまとめたレポートが表示されるようになります。"
             >
-              <DebatePointsContent debateData={questionDetail?.debateData} />
+              <DebatePointsContent
+                debateData={
+                  questionDetail.debateData
+                }
+              />
             </ReportCard>
 
-            {/* 意見まとめカード */}
             <ReportCard
               title="意見まとめ"
               downloadButtonText="PDFダウンロード"
               isEmpty={
-                !questionDetail?.reportExample ||
-                questionDetail?.reportExample?.issues?.length === 0
+                !questionDetail.reportExample ||
+                questionDetail.reportExample
+                  ?.issues?.length === 0
               }
               emptyDescription="多くの対話が集まると、意見をまとめたレポートが表示されるようになります。"
             >
               <OpinionSummaryContent
                 reportExample={
-                  questionDetail?.reportExample ?? {
+                  questionDetail.reportExample ?? {
                     introduction:
                       "レポート例はまだ作成されていません。より多くの意見が集まるとレポート例が表示されるようになります。",
                     issues: [],
@@ -402,24 +618,34 @@ const QuestionDetail = () => {
               />
             </ReportCard>
 
-            {/* イラスト要約カード */}
             <IllustrationReportCard
               title="イラスト要約"
               downloadButtonText="画像ダウンロード"
-              isEmpty={!questionDetail?.visualReport}
+              isEmpty={
+                !questionDetail.visualReport
+              }
               emptyDescription="多くの対話が集まると、意見をまとめたイラストが表示されるようになります。"
             >
               <IllustrationSummaryContent
-                visualReport={questionDetail?.visualReport}
-                questionDetail={questionDetail}
+                visualReport={
+                  questionDetail.visualReport
+                }
+                questionDetail={
+                  questionDetail
+                }
               />
             </IllustrationReportCard>
           </div>
         </div>
+
         <FloatingChat
           ref={chatRef}
-          onSendMessage={handleSendMessage}
-          disabled={isCommentDisabled}
+          onSendMessage={
+            handleSendMessage
+          }
+          disabled={
+            isCommentDisabled
+          }
         />
       </>
     );
@@ -428,7 +654,9 @@ const QuestionDetail = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="text-center py-8">
-        <p>質問の詳細を表示できません。</p>
+        <p>
+          質問の詳細を表示できません。
+        </p>
       </div>
     </div>
   );
