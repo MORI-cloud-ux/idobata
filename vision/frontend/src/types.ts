@@ -114,7 +114,7 @@ export interface Solution {
 export interface Question {
   _id: string;
   content?: string;
-  questionText?: string;
+  questionText: string;
   tagLine?: string;
   tags?: string[];
   createdAt?: string;
